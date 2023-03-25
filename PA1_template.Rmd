@@ -7,7 +7,10 @@ output:
 
 
 ## Loading and preprocessing the data
-
+```{r openfile}
+library(tidyverse)
+activ_monit_dat <- read_csv("./activity/activity.csv", na = "NA")
+```
 
 
 ## What is mean total number of steps taken per day?
