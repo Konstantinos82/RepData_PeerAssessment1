@@ -9,20 +9,167 @@ output:
 ## Loading and preprocessing the data
 ```{r openfile, echo=TRUE}
 library(tidyverse)
+library(xtable)
 activ_monit_dat <- read_csv("./activity/activity.csv", na = "NA")
+```
+```{r no scientific notation,echo=FALSE}
+options(scipen = 999)
+```
+
+## What is mean total number of steps taken per day?
+```{r steps complete dataset, echo=TRUE}
+steps_per_day <- activ_monit_dat %>% 
+  group_by(date) %>% 
+  summarise(steps_day = sum(steps,na.rm = T))
+```
+
+#### *Total Steps per day:*
+
+```{r, echo=TRUE}
+steps_per_day
 ```
 
 
-## What is mean total number of steps taken per day?
+### Histogram of total number of steps per day
 
+```{r,echo=TRUE}
+p1 <- ggplot(steps_per_day,aes(steps_day)) +
+  geom_histogram(color = "blue") +
+  labs(title = "Total Number of Steps Per Day",
+       subtitle = "with missing data") +
+  xlab("number of steps")
+  
+p1
+```
 
+#### *Median of total number of steps per day*
+
+```{r mediansteps,echo=TRUE}
+med_steps <- median(steps_per_day$steps_day)
+```
+
+**Median** of total number of steps per day is **`r med_steps`**
+
+#### *Mean of total number of steps per day*
+
+```{r meansteps, echo=TRUE}
+aver_steps <- mean(steps_per_day$steps_day)
+```
+
+**Mean** of total number of steps per day is **`r aver_steps`**
 
 ## What is the average daily activity pattern?
 
-
+```{r aver steps across all days,echo=TRUE}
+aver_daily_pattern <- activ_monit_dat %>% 
+  group_by(interval) %>% 
+  summarise(average_steps_per_interval = mean(steps,na.rm=T))
+  
+ggplot(aver_daily_pattern ,aes(x=interval,y=average_steps_per_interval))+
+  geom_line() +
+  labs(title = "Average daily Active Pattern") +
+  xlab("5 minute interval") + 
+  ylab("Average number of steps taken")
+```
+```{r max pattern of steps,echo=TRUE}
+max_pat_n_steps <- aver_daily_pattern %>% 
+  filter(average_steps_per_interval == max(average_steps_per_interval)) %>% select(interval)
+```
+The 5-minute interval which contains the maximum number is `r max_pat_n_steps`
 
 ## Imputing missing values
+
+```{r missing,echo=TRUE}
+missing = sum(!complete.cases(activ_monit_dat))
+```
+
+Total number of **missing values** in the dataset is **`r missing`**
+
+*replace na values in steps variable by the mean of total steps*
+*and store this new complete dataset in activ_complete dataframe*
+
+```{r replace na steps,echo=TRUE}
+activ_complete <- activ_monit_dat %>%
+  mutate(steps = replace_na(steps,mean(steps,na.rm = TRUE)))
+```
+
+*Check if there are any missing values left in steps variable, as well as in interval variable*
+
+```{r check for missing,echo=TRUE}
+sum(is.na(activ_complete$steps))
+sum(is.na(activ_complete$interval))
+```
+
+*Aggregate complete dataset to daily*
+
+```{r complete dataset to daily, echo=TRUE}
+steps_complete <- activ_complete %>% 
+  group_by(date) %>% 
+  summarise(steps_day = sum(steps,na.rm = T))
+```
+
+*mean and median calculation for complete dataset*
+
+```{r mean and median complete dataset,echo=TRUE}
+
+average_steps_complete <- round(mean(steps_complete$steps_day),1)
+med_steps_complete <- round(median(steps_complete$steps_day),1)
+```
+
+Complete dataset **mean** value is **`r average_steps_complete`** and **median** **`r med_steps_complete`**. It can be seen that median and mean have the same value, denoting that by replace missing values with the mean, distribution approximates normal distribution, compared to the raw dataset.
+
+*Data distribution of the total number of steps taken each day on a histogram using complete dataset*
+
+```{r histogram of complete dataset,echo=TRUE}
+p2 <- ggplot(steps_complete,aes(steps_day)) +
+  geom_histogram(color = "red") +
+  labs(title = "Total Number of Steps Per Day",
+       subtitle = "complete dataset") +
+  xlab("number of steps")
+
+p2
+```
+
+*comparison of steps taken per day distributions (dataset with missing values, complete dataset). Histograms created with ggplot as well as cowplot packages*
+
+```{r steps distribution comparison,echo=TRUE}
+library(cowplot)
+
+plot_grid(p1,p2, ncol = 2)
+
+```
 
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+wday function from **lubridate** package is used, for dividing dates to weekdays and weekends. *Monday* corresponds to *1* and Sunday, as the last day of the week, to *7*. For identifying activity patterns between the levels, complete dataset is used. 
+
+```{r patterns weekdays/weekends,echo=TRUE}
+library(lubridate)
+
+activity_complete_steps <- activ_complete %>% 
+  mutate(dayofweek = wday(date),
+         weekends = ifelse(dayofweek>=6,"weekend","weekday"),
+         weekends = as.factor(weekends))
+
+head(steps_complete)
+```
+
+Using **lattice** package we create a panel plot containing a time series plot  of the 5-minute interval and the average number of steps taken, averaged across all weekday days or weekend days. 
+
+```{r panel plot,echo=TRUE}
+
+activity_complete_per_interval <- activity_complete_steps %>% 
+  group_by(interval,weekends) %>% 
+  summarise(steps_5min = mean(steps))
+
+library(lattice)
+
+xyplot(steps_5min~interval | weekends,data=activity_complete_per_interval,
+       type="l",
+       layout = c(1,2), ylab = "average steps",
+       xlab = "5 minutes interval",
+       main = "Time Series plot - Average number of Steps on weekends & weekdays")
+
+```
